@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Upload with Logo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        input[type="file"] {
+            margin: 10px;
+        }
+        canvas {
+            display: block;
+            margin: 20px auto;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Upload and Logo Placement</h1>
+    <input type="file" id="imageUploader" accept="image/*">
+    <input type="file" id="logoUploader" accept="image/*">
+    <select id="imageFormat">
+        <option value="image/png">PNG</option>
+        <option value="image/jpeg">JPEG</option>
+    </select>
+    <canvas id="canvas"></canvas>
+    <button id="downloadBtn">Download Image</button>
+
+    <script>
+        const imageUploader = document.getElementById('imageUploader');
+        const logoUploader = document.getElementById('logoUploader');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const imageFormat = document.getElementById('imageFormat');
+
+        let uploadedImage = null;
+        let uploadedLogo = null;
+
+        function isValidImage(file) {
+            return file && file.type.startsWith('image/');
+        }
+
+        imageUploader.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (isValidImage(file)) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        if (img.width === 0 || img.height === 0) {
+                            alert('Invalid image dimensions! Please upload a valid image.');
+                            return;
+                        }
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        uploadedImage = img;
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                alert('Please upload a valid image file.');
+            }
+        });
+
+        logoUploader.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (isValidImage(file)) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        if (uploadedImage) {
+                            const logoAspectRatio = img.width / img.height;
+                            const maxLogoSize = Math.min(canvas.width, canvas.height) * 0.2; // 20% of the image size
+                            let logoWidth, logoHeight;
+
+                            if (logoAspectRatio > 1) {
+                                // Landscape logo
+                                logoWidth = maxLogoSize;
+                                logoHeight = maxLogoSize / logoAspectRatio;
+                            } else {
+                                // Portrait or square logo
+                                logoHeight = maxLogoSize;
+                                logoWidth = maxLogoSize * logoAspectRatio;
+                            }
+
+                            if (logoWidth > canvas.width || logoHeight > canvas.height) {
+                                alert('Logo is too large to fit on the image!');
+                                return;
+                            }
+
+                            const xPosition = canvas.width - logoWidth - 10; // 10px from the right
+                            const yPosition = canvas.height - logoHeight - 10; // 10px from the bottom
+
+                            ctx.drawImage(img, xPosition, yPosition, logoWidth, logoHeight);
+                            uploadedLogo = img;
+                        } else {
+                            alert('Please upload an image first!');
+                        }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            } else {
+                alert('Please upload a valid image file.');
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (uploadedImage) {
+                const link = document.createElement('a');
+                link.download = `image_with_logo.${imageFormat.value.split('/')[1]}`;
+                link.href = canvas.toDataURL(imageFormat.value);
+                link.click();
+            } else {
+                alert('Please upload an image first!');
+            }
+        });
+    </script>
+</body>
+</html>

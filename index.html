@@ -9,14 +9,35 @@
             font-family: Arial, sans-serif;
             text-align: center;
             margin: 20px;
+            background: linear-gradient(to bottom right, #6a11cb, #2575fc);
+            color: white;
         }
-        input[type="file"] {
+        input[type="file"], select, button {
             margin: 10px;
+            padding: 10px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background-color: #ffffff;
+            color: #333;
+        }
+        input[type="file"]:hover, select:hover, button:hover {
+            background-color: #f1f1f1;
         }
         canvas {
             display: block;
             margin: 20px auto;
             border: 1px solid #ccc;
+            max-width: 90%;
+            height: auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        h1 {
+            animation: fadeIn 2s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
     </style>
 </head>
@@ -57,10 +78,11 @@
                             alert('Invalid image dimensions! Please upload a valid image.');
                             return;
                         }
-                        canvas.width = img.width;
-                        canvas.height = img.height;
+                        const scaleFactor = Math.min(800 / img.width, 600 / img.height, 1);
+                        canvas.width = img.width * scaleFactor;
+                        canvas.height = img.height * scaleFactor;
                         ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                         uploadedImage = img;
                     };
                     img.src = e.target.result;

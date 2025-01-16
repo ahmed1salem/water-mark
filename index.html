@@ -39,16 +39,25 @@
             from { opacity: 0; }
             to { opacity: 1; }
         }
+        .resize-controls {
+            display: none;
+            margin: 10px;
+        }
     </style>
 </head>
 <body>
     <h1>Image Upload and Logo Placement</h1>
-    <input type="file" id="imageUploader" accept="image/*">
+    <input type="file" id="imageUploader" accept="image/*" multiple>
     <input type="file" id="logoUploader" accept="image/*">
     <select id="imageFormat">
         <option value="image/png">PNG</option>
         <option value="image/jpeg">JPEG</option>
     </select>
+    <div class="resize-controls">
+        <label>Logo Size (%): <input type="range" id="logoSize" min="10" max="50" value="20"></label>
+        <label>X Offset: <input type="number" id="xOffset" value="10" min="0"></label>
+        <label>Y Offset: <input type="number" id="yOffset" value="10" min="0"></label>
+    </div>
     <canvas id="canvas"></canvas>
     <button id="downloadBtn">Download Image</button>
 
@@ -59,8 +68,12 @@
         const ctx = canvas.getContext('2d');
         const downloadBtn = document.getElementById('downloadBtn');
         const imageFormat = document.getElementById('imageFormat');
+        const resizeControls = document.querySelector('.resize-controls');
+        const logoSizeInput = document.getElementById('logoSize');
+        const xOffsetInput = document.getElementById('xOffset');
+        const yOffsetInput = document.getElementById('yOffset');
 
-        let uploadedImage = null;
+        let uploadedImages = [];
         let uploadedLogo = null;
 
         function isValidImage(file) {
@@ -68,28 +81,23 @@
         }
 
         imageUploader.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (isValidImage(file)) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        if (img.width === 0 || img.height === 0) {
-                            alert('Invalid image dimensions! Please upload a valid image.');
-                            return;
-                        }
-                        const scaleFactor = Math.min(800 / img.width, 600 / img.height, 1);
-                        canvas.width = img.width * scaleFactor;
-                        canvas.height = img.height * scaleFactor;
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        uploadedImage = img;
+            const files = event.target.files;
+            uploadedImages = [];
+            for (const file of files) {
+                if (isValidImage(file)) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            uploadedImages.push(img);
+                            updateCanvas();
+                        };
+                        img.src = e.target.result;
                     };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            } else {
-                alert('Please upload a valid image file.');
+                    reader.readAsDataURL(file);
+                } else {
+                    alert('Please upload valid image files.');
+                }
             }
         });
 
@@ -100,51 +108,74 @@
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
-                        if (uploadedImage) {
-                            const logoAspectRatio = img.width / img.height;
-                            const maxLogoSize = Math.min(canvas.width, canvas.height) * 0.2; // 20% of the image size
-                            let logoWidth, logoHeight;
-
-                            if (logoAspectRatio > 1) {
-                                // Landscape logo
-                                logoWidth = maxLogoSize;
-                                logoHeight = maxLogoSize / logoAspectRatio;
-                            } else {
-                                // Portrait or square logo
-                                logoHeight = maxLogoSize;
-                                logoWidth = maxLogoSize * logoAspectRatio;
-                            }
-
-                            if (logoWidth > canvas.width || logoHeight > canvas.height) {
-                                alert('Logo is too large to fit on the image!');
-                                return;
-                            }
-
-                            const xPosition = canvas.width - logoWidth - 10; // 10px from the right
-                            const yPosition = canvas.height - logoHeight - 10; // 10px from the bottom
-
-                            ctx.drawImage(img, xPosition, yPosition, logoWidth, logoHeight);
+                        if (uploadedImages.length > 0) {
+                            resizeControls.style.display = 'block';
                             uploadedLogo = img;
+                            updateCanvas();
                         } else {
-                            alert('Please upload an image first!');
+                            alert('Please upload images first!');
                         }
                     };
                     img.src = e.target.result;
                 };
                 reader.readAsDataURL(file);
             } else {
-                alert('Please upload a valid image file.');
+                alert('Please upload a valid image file for the logo.');
             }
         });
 
+        function updateCanvas() {
+            if (uploadedImages.length > 0) {
+                const scaleFactor = Math.min(800 / uploadedImages[0].width, 600 / uploadedImages[0].height, 1);
+                canvas.width = uploadedImages[0].width * scaleFactor;
+                canvas.height = uploadedImages[0].height * scaleFactor;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                uploadedImages.forEach((img, index) => {
+                    const xPosition = (index % 3) * (canvas.width / 3);
+                    const yPosition = Math.floor(index / 3) * (canvas.height / Math.ceil(uploadedImages.length / 3));
+                    ctx.drawImage(img, xPosition, yPosition, canvas.width / 3, canvas.height / Math.ceil(uploadedImages.length / 3));
+                });
+
+                if (uploadedLogo) {
+                    placeLogo();
+                }
+            }
+        }
+
+        function placeLogo() {
+            if (uploadedLogo) {
+                const maxLogoSize = Math.min(canvas.width, canvas.height) * (logoSizeInput.value / 100);
+                const logoAspectRatio = uploadedLogo.width / uploadedLogo.height;
+
+                let logoWidth, logoHeight;
+                if (logoAspectRatio > 1) {
+                    logoWidth = maxLogoSize;
+                    logoHeight = maxLogoSize / logoAspectRatio;
+                } else {
+                    logoHeight = maxLogoSize;
+                    logoWidth = maxLogoSize * logoAspectRatio;
+                }
+
+                const xPosition = canvas.width - logoWidth - parseInt(xOffsetInput.value);
+                const yPosition = canvas.height - logoHeight - parseInt(yOffsetInput.value);
+
+                ctx.drawImage(uploadedLogo, xPosition, yPosition, logoWidth, logoHeight);
+            }
+        }
+
+        logoSizeInput.addEventListener('input', placeLogo);
+        xOffsetInput.addEventListener('input', placeLogo);
+        yOffsetInput.addEventListener('input', placeLogo);
+
         downloadBtn.addEventListener('click', () => {
-            if (uploadedImage) {
+            if (uploadedImages.length > 0) {
                 const link = document.createElement('a');
                 link.download = `image_with_logo.${imageFormat.value.split('/')[1]}`;
                 link.href = canvas.toDataURL(imageFormat.value);
                 link.click();
             } else {
-                alert('Please upload an image first!');
+                alert('Please upload images first!');
             }
         });
     </script>

@@ -8,9 +8,31 @@
         body {
             font-family: Arial, sans-serif;
             text-align: center;
-            margin: 20px;
-            background: linear-gradient(to bottom right, #6a11cb, #2575fc);
+            margin: 0;
+            padding: 0;
+            background-image: url('https://via.placeholder.com/1920x1080'); /* يمكنك تغيير الرابط إلى صورة خلفية مفضلة */
+            background-size: cover;
+            background-position: center;
             color: white;
+            height: 100vh; /* جعل الخلفية تملأ الشاشة */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        h1 {
+            animation: fadeIn 2s;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .container {
+            background: rgba(0, 0, 0, 0.5); /* خلفية مظللة لتسهيل القراءة */
+            padding: 20px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 900px;
+            margin: 0 auto;
         }
         input[type="file"], select, button {
             margin: 10px;
@@ -32,40 +54,33 @@
             height: auto;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         }
-        h1 {
-            animation: fadeIn 2s;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
         .resize-controls {
             display: none;
             margin: 10px;
         }
     </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script> <!-- JSZip library -->
 </head>
 <body>
-    <h1>Image Upload and Logo Placement</h1>
-    <input type="file" id="imageUploader" accept="image/*" multiple>
-    <input type="file" id="logoUploader" accept="image/*">
-    <select id="imageFormat">
-        <option value="image/png">PNG</option>
-        <option value="image/jpeg">JPEG</option>
-    </select>
-    <div class="resize-controls">
-        <label>Logo Size (%): <input type="range" id="logoSize" min="10" max="50" value="20"></label>
-        <label>X Offset: <input type="number" id="xOffset" value="10" min="0"></label>
-        <label>Y Offset: <input type="number" id="yOffset" value="10" min="0"></label>
+    <div class="container">
+        <h1>Image Upload and Logo Placement</h1>
+        <input type="file" id="imageUploader" accept="image/*" multiple>
+        <input type="file" id="logoUploader" accept="image/*">
+        <select id="imageFormat">
+            <option value="image/png">PNG</option>
+            <option value="image/jpeg">JPEG</option>
+        </select>
+        <div class="resize-controls">
+            <label>Logo Size (%): <input type="range" id="logoSize" min="10" max="50" value="20"></label>
+            <label>X Offset: <input type="number" id="xOffset" value="10" min="0"></label>
+            <label>Y Offset: <input type="number" id="yOffset" value="10" min="0"></label>
+        </div>
+        <button id="downloadBtn">Download Images</button>
     </div>
-    <canvas id="canvas"></canvas>
-    <button id="downloadBtn">Download Image</button>
 
     <script>
         const imageUploader = document.getElementById('imageUploader');
         const logoUploader = document.getElementById('logoUploader');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
         const downloadBtn = document.getElementById('downloadBtn');
         const imageFormat = document.getElementById('imageFormat');
         const resizeControls = document.querySelector('.resize-controls');
@@ -90,7 +105,6 @@
                         const img = new Image();
                         img.onload = () => {
                             uploadedImages.push(img);
-                            updateCanvas();
                         };
                         img.src = e.target.result;
                     };
@@ -108,13 +122,8 @@
                 reader.onload = (e) => {
                     const img = new Image();
                     img.onload = () => {
-                        if (uploadedImages.length > 0) {
-                            resizeControls.style.display = 'block';
-                            uploadedLogo = img;
-                            updateCanvas();
-                        } else {
-                            alert('Please upload images first!');
-                        }
+                        uploadedLogo = img;
+                        resizeControls.style.display = 'block';
                     };
                     img.src = e.target.result;
                 };
@@ -124,58 +133,57 @@
             }
         });
 
-        function updateCanvas() {
-            if (uploadedImages.length > 0) {
-                const scaleFactor = Math.min(800 / uploadedImages[0].width, 600 / uploadedImages[0].height, 1);
-                canvas.width = uploadedImages[0].width * scaleFactor;
-                canvas.height = uploadedImages[0].height * scaleFactor;
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+        function placeLogo(image, logo) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            const maxLogoSize = Math.min(image.width, image.height) * (logoSizeInput.value / 100);
+            const logoAspectRatio = logo.width / logo.height;
 
-                uploadedImages.forEach((img, index) => {
-                    const xPosition = (index % 3) * (canvas.width / 3);
-                    const yPosition = Math.floor(index / 3) * (canvas.height / Math.ceil(uploadedImages.length / 3));
-                    ctx.drawImage(img, xPosition, yPosition, canvas.width / 3, canvas.height / Math.ceil(uploadedImages.length / 3));
-                });
-
-                if (uploadedLogo) {
-                    placeLogo();
-                }
+            let logoWidth, logoHeight;
+            if (logoAspectRatio > 1) {
+                logoWidth = maxLogoSize;
+                logoHeight = maxLogoSize / logoAspectRatio;
+            } else {
+                logoHeight = maxLogoSize;
+                logoWidth = maxLogoSize * logoAspectRatio;
             }
+
+            canvas.width = image.width;
+            canvas.height = image.height;
+
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+            const xPosition = canvas.width - logoWidth - parseInt(xOffsetInput.value);
+            const yPosition = canvas.height - logoHeight - parseInt(yOffsetInput.value);
+
+            ctx.drawImage(logo, xPosition, yPosition, logoWidth, logoHeight);
+
+            return canvas.toDataURL(imageFormat.value);
         }
-
-        function placeLogo() {
-            if (uploadedLogo) {
-                const maxLogoSize = Math.min(canvas.width, canvas.height) * (logoSizeInput.value / 100);
-                const logoAspectRatio = uploadedLogo.width / uploadedLogo.height;
-
-                let logoWidth, logoHeight;
-                if (logoAspectRatio > 1) {
-                    logoWidth = maxLogoSize;
-                    logoHeight = maxLogoSize / logoAspectRatio;
-                } else {
-                    logoHeight = maxLogoSize;
-                    logoWidth = maxLogoSize * logoAspectRatio;
-                }
-
-                const xPosition = canvas.width - logoWidth - parseInt(xOffsetInput.value);
-                const yPosition = canvas.height - logoHeight - parseInt(yOffsetInput.value);
-
-                ctx.drawImage(uploadedLogo, xPosition, yPosition, logoWidth, logoHeight);
-            }
-        }
-
-        logoSizeInput.addEventListener('input', placeLogo);
-        xOffsetInput.addEventListener('input', placeLogo);
-        yOffsetInput.addEventListener('input', placeLogo);
 
         downloadBtn.addEventListener('click', () => {
-            if (uploadedImages.length > 0) {
-                const link = document.createElement('a');
-                link.download = `image_with_logo.${imageFormat.value.split('/')[1]}`;
-                link.href = canvas.toDataURL(imageFormat.value);
-                link.click();
+            if (uploadedImages.length > 0 && uploadedLogo) {
+                const zip = new JSZip();
+
+                uploadedImages.forEach((img, index) => {
+                    const imageWithLogo = placeLogo(img, uploadedLogo);
+                    const imageData = imageWithLogo.split(',')[1]; // Extract base64 image data
+                    const ext = imageFormat.value.split('/')[1]; // Extract file extension
+
+                    // Add the image to the zip file
+                    zip.file(`image_${index + 1}.${ext}`, imageData, { base64: true });
+                });
+
+                zip.generateAsync({ type: 'blob' })
+                    .then(function(content) {
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(content);
+                        link.download = 'images_with_logos.zip';
+                        link.click();
+                    });
             } else {
-                alert('Please upload images first!');
+                alert('Please upload images and logo first!');
             }
         });
     </script>
